@@ -20,7 +20,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Action Buttons
     const optimizeBtn = document.getElementById('optimizeBtn');
     const exportBtn = document.getElementById('exportBtn');
+    const exportCalendarBtn = document.getElementById('exportCalendarBtn');
+    const simulateSkipBtn = document.getElementById('simulateSkipBtn');
     const toast = document.getElementById('toast');
+    const simulationBanner = document.getElementById('simulationBanner');
     
     // Modal
     const howItWorksBtn = document.getElementById('howItWorksBtn');
@@ -31,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentInputData = null;
     let generatedPlanData = [];
     let isOptimized = false;
+    let simulationDaysSkipped = 0;
 
     // Set minimum exam date
     const today = new Date();
@@ -42,6 +46,8 @@ document.addEventListener('DOMContentLoaded', () => {
     form.addEventListener('submit', handleFormSubmit);
     optimizeBtn.addEventListener('click', handleOptimize);
     exportBtn.addEventListener('click', exportPlan);
+    exportCalendarBtn.addEventListener('click', exportCalendar);
+    simulateSkipBtn.addEventListener('click', handleSimulateSkip);
     
     // Modal handling
     howItWorksBtn.addEventListener('click', () => infoModal.classList.add('show'));
@@ -80,6 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         isOptimized = false; // Reset optimization state
+        simulationDaysSkipped = 0; // Reset simulation
         optimizeBtn.style.display = 'inline-flex';
         optimizeBtn.innerHTML = `<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Optimize Plan`;
 
@@ -103,6 +110,12 @@ document.addEventListener('DOMContentLoaded', () => {
         optimizeBtn.innerHTML = `✨ Plan Optimized`;
         optimizeBtn.style.pointerEvents = 'none';
         optimizeBtn.style.opacity = '0.7';
+    }
+
+    function handleSimulateSkip() {
+        if (!currentInputData) return;
+        simulationDaysSkipped++;
+        executeAIPlanningSequence("Simulating procrastination...", false);
     }
 
     function executeAIPlanningSequence(loadingMsg, optimized = false) {
@@ -145,7 +158,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 1. Core Metrics
         const timeDiff = data.examDate.getTime() - today.getTime();
-        const totalDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) - 1; 
+        let totalDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) - 1 - simulationDaysSkipped; 
+        if (totalDays < 0) totalDays = 0;
         const totalAvailableHours = totalDays * data.dailyHours;
 
         const analysis = {
@@ -192,6 +206,12 @@ document.addEventListener('DOMContentLoaded', () => {
         priorityScores.forEach(sub => {
             sub.score = (sub.urgencyVal * 2) + sub.weaknessVal + (sub.isWeak ? timeConstraintPenalty : 0);
             
+            // Risk Scoring Calculation
+            sub.riskPercent = Math.min(99, Math.max(5, Math.floor((sub.score / 25) * 100)));
+            if (sub.score >= 15) sub.riskLevel = "High";
+            else if (sub.score >= 8) sub.riskLevel = "Medium";
+            else sub.riskLevel = "Low";
+            
             // Generate human-readable reason
             let reasonParts = [];
             if (sub.weaknessVal > 0) reasonParts.push("flagged as a weak area");
@@ -199,6 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (timeConstraintPenalty > 0 && sub.isWeak) reasonParts.push("time constraints dictate prioritizing weaknesses");
             
             sub.reason = reasonParts.length > 0 ? `Prioritized because: ${reasonParts.join(', ')}.` : "Standard coverage required.";
+            sub.reason += ` (Risk: ${sub.riskLevel}, ${sub.riskPercent}%)`;
         });
 
         // Sort descending
@@ -221,10 +242,12 @@ document.addEventListener('DOMContentLoaded', () => {
             analysis.decisionsLog.push(`Exam is extremely close. Aborting new material learning. Switching entirely to Revision Mode.`);
             return {
                 plan: Array.from({length: planDays}).map((_, i) => ({
-                    date: new Date(today.getTime() + ((i+1) * 86400000)),
+                    date: new Date(today.getTime() + ((i + 1 + simulationDaysSkipped) * 86400000)),
                     isRevision: true,
                     isCramming: true,
                     subject: 'Intensive Revision',
+                    riskLevel: 'High',
+                    riskPercent: 95,
                     topics: priorityScores.map(p => p.name).join(', '),
                     hours: data.dailyHours,
                     preferredTime: data.preferredTime
@@ -260,7 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         for (let i = 0; i < studyDaysCount; i++) {
-            const planDate = new Date(today.getTime() + ((i+1) * 86400000));
+            const planDate = new Date(today.getTime() + ((i + 1 + simulationDaysSkipped) * 86400000));
             const sub = pool[i % pool.length];
             plan.push({
                 date: planDate,
@@ -268,6 +291,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 isCramming: false,
                 subject: sub.name,
                 isWeak: sub.isWeak,
+                riskLevel: sub.riskLevel,
+                riskPercent: sub.riskPercent,
                 topics: sub.isWeak ? 'Targeted weakness practice' : 'Standard review',
                 hours: data.dailyHours,
                 preferredTime: data.preferredTime
@@ -275,12 +300,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         for (let i = 0; i < revisionDaysCount; i++) {
-            const planDate = new Date(today.getTime() + ((studyDaysCount + i + 1) * 86400000));
+            const planDate = new Date(today.getTime() + ((studyDaysCount + i + 1 + simulationDaysSkipped) * 86400000));
             plan.push({
                 date: planDate,
                 isRevision: true,
                 isCramming: false,
                 subject: 'Full Syllabus Revision',
+                riskLevel: 'Medium',
+                riskPercent: 50,
                 topics: 'Mock tests and recall exercises',
                 hours: data.dailyHours,
                 preferredTime: data.preferredTime
@@ -305,6 +332,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Warnings
         timeWarningBanner.style.display = analysis.isInsufficientTime ? 'flex' : 'none';
+        if (simulationBanner) {
+            simulationBanner.style.display = simulationDaysSkipped > 0 ? 'flex' : 'none';
+        }
 
         // Dynamic AI Strategy Text
         let aiText = "";
@@ -344,6 +374,10 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (dayPlan.isCramming) { itemClass += ' urgent'; badges += `<span class="badge badge-weak">Urgent</span>`; }
             else if (dayPlan.isWeak) { badges += `<span class="badge badge-weak">Targeted</span>`; }
 
+            if (dayPlan.riskLevel) {
+                badges += `<span class="badge badge-risk-${dayPlan.riskLevel.toLowerCase()}">${dayPlan.riskLevel} Risk (${dayPlan.riskPercent}%)</span>`;
+            }
+
             scheduleTimeline.insertAdjacentHTML('beforeend', `
                 <div class="${itemClass}">
                     <div class="timeline-date">${dateStr}</div>
@@ -366,6 +400,40 @@ document.addEventListener('DOMContentLoaded', () => {
             txt += `[${d.date.toLocaleDateString()}] ${d.subject}\n   Focus: ${d.topics} | ${d.hours}h\n`;
         });
         navigator.clipboard.writeText(txt).then(() => showToast("Plan copied to clipboard!"));
+    }
+
+    function exportCalendar() {
+        if (!generatedPlanData.length) return;
+        
+        let icsData = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//StudyGenius AI//EN\n";
+        
+        generatedPlanData.forEach((d, i) => {
+            const dateStr = d.date.toISOString().replace(/[-:]/g, '').split('T')[0];
+            const nextDate = new Date(d.date);
+            nextDate.setDate(nextDate.getDate() + 1);
+            const nextDateStr = nextDate.toISOString().replace(/[-:]/g, '').split('T')[0];
+            
+            icsData += "BEGIN:VEVENT\n";
+            icsData += `UID:studygenius-${Date.now()}-${i}@studygenius.ai\n`;
+            icsData += `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z\n`;
+            icsData += `DTSTART;VALUE=DATE:${dateStr}\n`;
+            icsData += `DTEND;VALUE=DATE:${nextDateStr}\n`;
+            icsData += `SUMMARY:Study: ${d.subject}\n`;
+            icsData += `DESCRIPTION:Topics: ${d.topics}\\nHours: ${d.hours}\\nPreferred Time: ${d.preferredTime}\\nRisk Level: ${d.riskLevel || 'N/A'}\\n\\nGenerated by StudyGenius AI\n`;
+            icsData += "END:VEVENT\n";
+        });
+        
+        icsData += "END:VCALENDAR";
+
+        const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'study_plan.ics';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showToast("Calendar file downloaded!");
     }
 
     function showToast(msg, isError = false) {
