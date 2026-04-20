@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Study Planner</title>
+    <meta name="description" content="An AI-powered student study planner that generates optimized study schedules.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" aria-hidden="true">
+        <div class="spinner"></div>
+        <p id="loadingText" aria-live="polite">Analyzing your schedule...</p>
+    </div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-area">
+                <svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="var(--primary-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 17L12 22L22 17" stroke="var(--primary-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 12L12 17L22 12" stroke="var(--primary-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <h1>StudyGenius AI</h1>
+            </div>
+            <button id="howItWorksBtn" class="btn-secondary" aria-label="Open information about how the planning logic works">
+                <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+                How it works
+            </button>
+        </header>
+
+        <main class="main-content">
+            <!-- Form Section -->
+            <section class="form-section panel" aria-labelledby="formHeading">
+                <h2 id="formHeading">Create Your Plan</h2>
+                <p class="subtitle">Enter your details to generate an AI-optimized schedule.</p>
+                
+                <div id="formErrorAnnouncer" class="sr-only" aria-live="assertive"></div>
+
+                <form id="plannerForm" novalidate>
+                    <div class="form-group">
+                        <label for="examDate">Exam Date <span class="required" aria-hidden="true">*</span><span class="sr-only">Required</span></label>
+                        <input type="date" id="examDate" name="examDate" required aria-describedby="examDateError">
+                        <span class="error-message" id="examDateError" role="alert"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="subjects">Subjects (comma-separated) <span class="required" aria-hidden="true">*</span><span class="sr-only">Required</span></label>
+                        <input type="text" id="subjects" name="subjects" placeholder="e.g., Math, Physics, Chemistry" required aria-describedby="subjectsError">
+                        <span class="error-message" id="subjectsError" role="alert"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="weakTopics">Weak Subjects/Topics (comma-separated)</label>
+                        <input type="text" id="weakTopics" name="weakTopics" placeholder="e.g., Physics, Calculus" aria-describedby="weakTopicsHelper">
+                        <small id="weakTopicsHelper" class="helper-text">I will assign higher priority scores to these areas.</small>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="studyHours">Daily Study Hours <span class="required" aria-hidden="true">*</span><span class="sr-only">Required</span></label>
+                            <input type="number" id="studyHours" name="studyHours" min="1" max="24" placeholder="e.g., 4" required aria-describedby="studyHoursError">
+                            <span class="error-message" id="studyHoursError" role="alert"></span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="preferredTime">Preferred Time <span class="required" aria-hidden="true">*</span><span class="sr-only">Required</span></label>
+                            <select id="preferredTime" name="preferredTime" required aria-describedby="preferredTimeError">
+                                <option value="" disabled selected>Select time</option>
+                                <option value="Morning">Morning</option>
+                                <option value="Afternoon">Afternoon</option>
+                                <option value="Evening">Evening</option>
+                                <option value="Night">Night</option>
+                            </select>
+                            <span class="error-message" id="preferredTimeError" role="alert"></span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary" id="generateBtn">
+                        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                        Generate Smart Plan
+                    </button>
+                </form>
+            </section>
+
+            <!-- Dashboard / Results Section -->
+            <section class="dashboard-section panel" id="dashboardSection" style="display: none;" aria-labelledby="dashboardHeading">
+                <div class="dashboard-header">
+                    <h2 id="dashboardHeading">Your AI Study Dashboard</h2>
+                    <div class="dashboard-actions">
+                        <button id="optimizeBtn" class="btn-magic" aria-label="Optimize Plan">
+                            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                            Optimize Plan
+                        </button>
+                        <button id="exportBtn" class="btn-outline" aria-label="Copy plan to clipboard">
+                            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            Copy Plan
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Insufficient Hours Warning -->
+                <div id="timeWarningBanner" class="warning-banner" role="alert" style="display: none;">
+                    <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    <div class="warning-content">
+                        <strong>Critical Warning: Limited Time</strong>
+                        <p id="warningText">Your available time is limited relative to the number of subjects. I'm focusing only on the most critical topics.</p>
+                    </div>
+                </div>
+
+                <!-- Smart Insights Section -->
+                <div class="smart-insights">
+                    <h3>💡 Smart Insights</h3>
+                    <ul id="insightsList" class="insights-list">
+                        <!-- Populated dynamically -->
+                    </ul>
+                </div>
+                
+                <div class="summary-cards">
+                    <div class="card">
+                        <div class="card-icon blue" aria-hidden="true">📅</div>
+                        <div class="card-content">
+                            <h3>Days Left</h3>
+                            <p id="summaryDaysLeft">--</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon green" aria-hidden="true">⏱️</div>
+                        <div class="card-content">
+                            <h3>Total Hours</h3>
+                            <p id="summaryTotalHours">--</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon purple" aria-hidden="true">🎯</div>
+                        <div class="card-content">
+                            <h3>Priority Subjects</h3>
+                            <p id="summaryFocusAreas">--</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Assistant Analysis -->
+                <div class="assistant-analysis">
+                    <h3>🤖 Assistant's Strategy</h3>
+                    <p id="dynamicRecommendation" class="recommendation-text"></p>
+                    
+                    <details class="decision-details">
+                        <summary>How I made these decisions</summary>
+                        <div class="decision-content">
+                            <div class="formula-box">
+                                <strong>Scoring Formula:</strong>
+                                <code>Priority Score = (Urgency × 2) + Weakness + Time Constraint</code>
+                            </div>
+                            <div id="decisionLog">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="timeline-container">
+                    <h3>Your Optimized Schedule</h3>
+                    <div id="scheduleTimeline" class="timeline" aria-live="polite">
+                        <!-- Generated schedule will be injected here -->
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal for "How it works" -->
+    <div id="infoModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-content panel">
+            <button class="close-modal" aria-label="Close information modal">&times;</button>
+            <h2 id="modalTitle">AI Planning Logic</h2>
+            <div class="logic-explanation">
+                <p>StudyGenius AI doesn't just divide days by subjects. It acts like a real tutor, making strategic decisions based on constraints:</p>
+                <ol>
+                    <li><strong>Dynamic Priority Scoring:</strong> Each subject receives a score computed as: <code>(Urgency × 2) + Weakness + Time Constraint</code>. This ensures high-yield topics get attention when time is scarce.</li>
+                    <li><strong>Edge-Case Intelligence:</strong> If you input too many subjects for too few hours, the AI automatically compresses the plan and focuses only on high-priority modules.</li>
+                    <li><strong>Revision Mode:</strong> If your exam is 3 days or fewer away, the AI aborts learning new material and switches entirely to "Revision Mode" for retention.</li>
+                    <li><strong>Smart Optimization:</strong> Clicking "Optimize Plan" allows the AI to re-evaluate and aggressively trim standard topics to secure your weak points.</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
